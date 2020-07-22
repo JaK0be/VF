@@ -1,0 +1,59 @@
+module Tree
+
+  use int.Int
+
+  type tree 'a = Empty | Node (tree 'a) 'a (tree 'a)
+
+  let rec function size (t: tree 'a) : int =
+  match t with
+  |  Empty -> 0
+  |  Node l _ r -> 1 + (size l) + (size r)
+  end
+
+(* k ocorre em t *)
+  predicate memt (t : tree int) (k : int) =
+    match t with 
+    | Empty -> false
+    | Node l a r -> a = k || memt l k || memt r k
+    end
+
+(* todos elementos de t <= x *)    
+  predicate leq_tree (x : int) (t : tree int) =
+    match t with
+    | Empty -> true
+    | Node l a r -> a <= x /\ leq_tree x l /\ leq_tree x r
+    end
+
+(* x <= todos elementos de t *)    
+  predicate geq_tree (x : int) (t : tree int) =
+    match t with
+    | Empty -> true
+    | Node l a r -> x <= a /\ geq_tree x l /\ leq_tree x r
+    end 
+
+(* t sorted inorder *)
+  predicate sortedBT (t : tree int) =
+    match t with
+    | Empty -> true
+    | Node l a r -> leq_tree a r /\ geq_tree a l /\ sortedBT l /\ sortedBT r
+    end
+
+(* num de ocorrências de x em t *)  
+  function num_occ (x: 'a) (t: tree 'a) : int =
+    match t with
+    | Empty -> 0
+    | Node l a r -> (if a = x then 1 else 0) + num_occ x l + num_occ x r
+    end
+
+(* inserção inorder *)
+  let rec add (t : tree int) (v : int) : tree int =
+    requires { sortedBT t }
+    ensures  { sortedBT result /\ memt result v /\ (num_occ v t) + 1 = num_occ v result /\ (size t) - (num_occ v t) = (size result) - (num_occ v result)}
+    match t with
+     | Empty -> Node (Empty) v (Empty)
+     | Node t1 x t2 ->
+       if v <= x then Node (add t1 v) x t2 
+                 else Node t1 x (add t2 v)
+    end
+  
+end
