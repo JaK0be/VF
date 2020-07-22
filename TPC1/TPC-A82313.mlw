@@ -1,0 +1,149 @@
+module BinTree
+
+  use int.Int
+  
+  type tree 'a = Empty | Node (tree 'a) 'a (tree 'a)
+
+
+    (* -------------- Definições auxiliares ------------- *)
+    
+  let rec function size (t: tree 'a) : int =
+  match t with
+  |  Empty -> 0
+  |  Node l _ r -> 1 + (size l) + (size r)
+  end  
+
+  (* k ocorre na abin t *)  
+  predicate memt (t : tree int) (k : int) =
+  match t with
+  | Empty -> false
+  | Node l n r -> (k = n) \/ memt r k \/ memt l k
+  end
+  
+  (* todos elementos da abin t <= x *)
+  predicate leq_tree (x : int) (t : tree int) =
+    forall k : int. memt t k -> k <= x
+  
+  (* x <= todos elementos da abin t *)  
+  predicate geq_tree (x : int) (t : tree int) =
+    forall k : int. memt t k -> x <= k
+  
+  (* abin t sorted inorder *)
+  predicate sortedBT (t : tree int) =
+  match t with
+  | Empty -> true
+  | Node l n r -> leq_tree n l /\ geq_tree n r /\ sortedBT l /\ sortedBT r
+  end
+  
+  (* num de ocorrências de x na abin t *)
+  function num_occ_tree (x: 'a) (t: tree 'a) : int =
+  match t with
+  | Empty -> 0
+  | Node l n r -> (if (x=n) then 1 else 0) + num_occ_tree n l + num_occ_tree n r
+  end 
+  
+  (* inserção inorder numa abin *)
+  let rec add (t : tree int) (v : int) : tree int =
+    requires { sortedBT t }
+    ensures  { sortedBT result }
+    ensures  { size result = size t + 1 } 
+    ensures  { forall x : int. memt result x <-> (memt t x \/ x = v) }
+    ensures  { forall x : int. num_occ_tree x result =
+                               if x = v then 1 + num_occ_tree x t else num_occ_tree x t }
+    variant {t}                               
+    match t with
+     | Empty -> Node (Empty) v (Empty)
+     | Node t1 x t2 ->
+       if v <= x then Node (add t1 v) x t2 
+                 else Node t1 x (add t2 v)
+    end
+
+    (* -------------- Parte 1 ------------- *)
+    
+    use list.List
+    use list.Append
+    use list.SortedInt
+    use list.Permut
+    use list.NumOcc
+
+    (*Travessia inorder de uma abin para originar uma lista ordenada*)
+    let rec function inorder (t: tree int) : list int =
+    requires { sortedBT t }
+    ensures { sorted result }
+    ensures { forall x : int. num_occ_tree x t = num_occ x result}
+    variant {t}
+    match t with
+      | Empty -> Nil
+      | Node l x r -> inorder l ++ Cons x (inorder r)
+    end
+    
+    (*Converte uma lista desordenada numa abin ordenada*)
+    let rec mkTree (l : list int) : tree int =
+    ensures{ sortedBT result}
+    ensures { forall x : int. num_occ_tree x result = num_occ x l}
+    variant {l}
+    match l with
+    | Nil -> Empty
+    | Cons head tail -> (add (mkTree tail) head)
+    end
+
+    (*TreSort usando inorder e mkTree*)
+    let function treesort  (l:list int) : list int
+        ensures { sorted result }
+        ensures { permut result l }
+    =
+    inorder (mkTree l) 
+    
+    
+    (* -------------- Parte 2 ------------- *)
+    
+    use list.Mem
+    
+    (*Partition de uma lista para os elementos menores ou iguais a h*)
+    let rec function partitionLE (h : int) (t : list int) : list int=
+    ensures { forall x : int. mem x result -> x<=h }
+    ensures { forall x:int. num_occ x result = num_occ x t}
+    variant { t }
+    match t with 
+    | Nil -> Nil
+    | Cons head tail -> if (head <= h) then (Cons head (partitionLE h tail))
+                                       else (partitionLE h tail)
+    end
+    
+    (*Partition de uma lista para os elementos maiores a h*)
+    let rec function partitionG (h : int) (t : list int) : list int =
+    ensures { forall x:int. mem x result -> x>h }
+    ensures { forall x:int. num_occ x result = num_occ x t}
+    variant { t }
+    match t with
+    | Nil -> Nil
+    | Cons head tail -> if (head > h) then (Cons head (partitionG h tail))
+                                      else (partitionG h tail)
+    end                                                                     
+  
+    (*Partition de uma lista em duas, l1 com os valores menores ou iguais a h e l2 com os maiores a h*)
+    let function partition (h:int) (t : list int) : (list int, list int)
+    ensures { let (l1,l2) = result in permut (l1++l2) t }
+    =
+    (partitionLE h t, partitionG h t)
+    
+    (*Converte uma lista desordenada numa abin ordenada*)
+    let rec function mkPartTree (l:list int) : tree int
+    ensures { sortedBT result } 
+    ensures { forall x : int. num_occ_tree x result = num_occ x l}
+    variant { l }
+    =
+    match l with
+    | Nil -> Empty
+    | Cons h t -> let (l1, l2) = partition h t in
+                  Node (mkPartTree l1) h (mkPartTree l2)
+    end                
+
+    (*QTreSort usando inorder e mkPartTree*)
+    let function qtreesort  (l:list int) : list int
+        ensures { sorted result }
+        ensures { permut result l }
+    =
+    inorder (mkPartTree l)
+
+end
